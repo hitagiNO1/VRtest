@@ -4,12 +4,14 @@ using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
 
 // 負責：從 UI 拖出道具 → 預覽跟著滑鼠 → 放開後放到地上（或取消）
+// 可放置時會畫一條指引線，指到曲面上的落點
 public class ItemPlacementController : MonoBehaviour
 {
     public Camera mainCam;          // 在 Inspector 手動拖 Main Camera
     public LayerMask groundLayer;   // 只打到地形（Ground）
     public float rayDistance = 500f;
     public float cancelAlpha = 0.3f; // 不能放的時候半透明程度
+    public float floatHeight = 2.5f; // 拖曳時 ghost 浮在落點上方多高（才看得到指引線）
 
     GameObject nowPrefab;   // 正在拖的是哪一種道具
     GameObject ghost;       // 預覽用的假物件（跟著滑鼠）
@@ -19,6 +21,39 @@ public class ItemPlacementController : MonoBehaviour
     // 預覽物件的材質（改透明度用）
     Material[] ghostMats;
     Color[] ghostColors;
+
+    // 指引線（可放置時才顯示）
+    LineRenderer guideLine;
+
+    // 給外面的選取腳本用：現在是不是正在拖道具
+    public bool IsDragging
+    {
+        get { return dragging; }
+    }
+
+    void Start()
+    {
+        // 自己生一條 LineRenderer 當指引線
+        GameObject lineObj = new GameObject("GuideLine");
+        lineObj.transform.SetParent(transform);
+
+        guideLine = lineObj.AddComponent<LineRenderer>();
+        guideLine.positionCount = 2;
+        guideLine.startWidth = 0.08f;
+        guideLine.endWidth = 0.08f;
+        guideLine.useWorldSpace = true;
+        guideLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        guideLine.receiveShadows = false;
+
+        // 用簡單顏色材質，黃線比較明顯
+        Material lineMat = new Material(Shader.Find("Sprites/Default"));
+        lineMat.color = Color.yellow;
+        guideLine.material = lineMat;
+        guideLine.startColor = Color.yellow;
+        guideLine.endColor = Color.yellow;
+
+        guideLine.enabled = false;
+    }
 
     // ===== 拖曳開始：複製一個預覽物件出來 =====
     public void StartDrag(GameObject prefab, Vector2 mousePos)
@@ -75,8 +110,8 @@ public class ItemPlacementController : MonoBehaviour
 
         if (hitGround == true)
         {
-            // 放在打到的點上方一點
-            ghost.transform.position = hit.point + Vector3.up * yOffset;
+            // 拖曳時先浮在落點上方，不要直接貼地（貼地的話指引線會變成超短看不到）
+            ghost.transform.position = hit.point + Vector3.up * (yOffset + floatHeight);
             ghost.transform.rotation = Quaternion.identity;
         }
         else
@@ -88,6 +123,16 @@ public class ItemPlacementController : MonoBehaviour
 
         // 能放 → 不透明；不能放 → 半透明（告訴玩家放開會取消）
         SetGhostAlpha(canPut);
+
+        // 可放置時才畫指引線：從浮空的 ghost 指到曲面上的準確落點
+        if (canPut == true)
+        {
+            ShowGuideLine(hit.point);
+        }
+        else
+        {
+            HideGuideLine();
+        }
     }
 
     // ===== 放開：決定要不要真的生成 =====
@@ -108,7 +153,7 @@ public class ItemPlacementController : MonoBehaviour
             {
                 float offset = GetHalfHeight(nowPrefab);
 
-                // 真正放到場景裡
+                // 真正放到場景裡（貼在地面上）
                 GameObject obj = Instantiate(nowPrefab);
                 obj.transform.position = hit.point + Vector3.up * offset;
                 obj.transform.rotation = Quaternion.identity;
@@ -132,6 +177,7 @@ public class ItemPlacementController : MonoBehaviour
     public void ClearGhost()
     {
         ClearGhostMats();
+        HideGuideLine();
 
         if (ghost != null)
         {
@@ -143,7 +189,24 @@ public class ItemPlacementController : MonoBehaviour
         dragging = false;
     }
 
+    // 畫線：從浮空 ghost 底部 → 地面落點
+    void ShowGuideLine(Vector3 groundPos)
+    {
+        guideLine.enabled = true;
 
+        // 起點：ghost 底部；終點：曲面上的準確位置
+        Vector3 startPos = ghost.transform.position - Vector3.up * yOffset;
+        guideLine.SetPosition(0, startPos);
+        guideLine.SetPosition(1, groundPos);
+    }
+
+    void HideGuideLine()
+    {
+        if (guideLine != null)
+        {
+            guideLine.enabled = false;
+        }
+    }
 
     // 從滑鼠位置發射線，看有沒有打到地面
     bool ShootRay(Vector2 mousePos, out RaycastHit hit)
