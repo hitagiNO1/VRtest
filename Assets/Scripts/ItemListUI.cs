@@ -21,6 +21,10 @@ public class ItemListUI : MonoBehaviour
     public ItemPlacementController placeScript;
     public ItemInfo[] items;                  // 道具清單
 
+    // VR 場景請勾起來：清單改成「點選」而不是滑鼠拖曳
+    public bool useClickSelect = false;
+    public VRPlaceInput vrPlace;              // useClickSelect 時要拖這個
+
     public float itemHeight = 64f; // 每一列高度
     public float space = 8f;       // 列與列之間的間隔
 
@@ -99,14 +103,23 @@ public class ItemListUI : MonoBehaviour
         row.AddComponent<CanvasRenderer>();
         row.AddComponent<Image>();
         row.AddComponent<LayoutElement>();
-        row.AddComponent<ItemRowUI>();
+
+        // 桌面：拖曳；VR：點選按鈕
+        if (useClickSelect == false)
+        {
+            row.AddComponent<ItemRowUI>();
+        }
+        else
+        {
+            row.AddComponent<Button>();
+        }
 
         RectTransform rowRT = row.GetComponent<RectTransform>();
         rowRT.SetParent(itemList, false);
 
         Image bg = row.GetComponent<Image>();
         bg.color = new Color(1f, 1f, 1f, 0.92f);
-        bg.raycastTarget = true; // 一定要開，不然拖不起來
+        bg.raycastTarget = true; // 一定要開，不然點／拖都沒反應
 
         LayoutElement le = row.GetComponent<LayoutElement>();
         le.preferredHeight = itemHeight;
@@ -157,8 +170,28 @@ public class ItemListUI : MonoBehaviour
         tmp.alignment = TextAlignmentOptions.Left;
         tmp.raycastTarget = false;
 
-        // 把資料傳給這一列的拖曳腳本
-        ItemRowUI rowUI = row.GetComponent<ItemRowUI>();
-        rowUI.Init(placeScript, prefab, showName, icon);
+        if (useClickSelect == false)
+        {
+            // 桌面：把資料傳給拖曳腳本
+            ItemRowUI rowUI = row.GetComponent<ItemRowUI>();
+            rowUI.Init(placeScript, prefab, showName, icon);
+        }
+        else
+        {
+            // VR：點這一列就選好要放的道具（並關掉清單，避免擋射線）
+            Button btn = row.GetComponent<Button>();
+            GameObject prefabToSelect = prefab; // 區域變數給 lambda 用
+            btn.onClick.AddListener(delegate
+            {
+                if (vrPlace != null)
+                {
+                    vrPlace.SelectPrefab(prefabToSelect);
+                }
+                if (listPanel != null)
+                {
+                    listPanel.SetActive(false);
+                }
+            });
+        }
     }
 }

@@ -167,6 +167,8 @@ MonoBehaviour:
   - showName: Cylinder
     icon: {fileID: 0}
     prefab: {fileID: 5363447884338298347, guid: 191a8e2186aeaba4b8ef33f79043796c, type: 3}
+  useClickSelect: 0
+  vrPlace: {fileID: 0}
   itemHeight: 64
   space: 8
 --- !u!114 &310010003
@@ -186,6 +188,12 @@ MonoBehaviour:
   menuPrefab: {fileID: 100001, guid: d1e2f3a4b5c64789a0b1c2d3e4f5a6b7, type: 3}
   rayDistance: 500
   menuOffset: {x: 1.2, y: 1.2, z: 0}
+  vrMode: 0
+  vrMenuHeight: 0.85
+  vrMenuTowardCam: 0.15
+  vrMenuScale: 0.005
+  selectRadius: 0.35
+  vrMenuOffset: {x: 0, y: 0.85, z: 0}
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -671,7 +679,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 310010002}
-        m_TargetAssemblyTypeName: ItemPaletteUI, Assembly-CSharp
+        m_TargetAssemblyTypeName: ItemListUI, Assembly-CSharp
         m_MethodName: OpenCloseList
         m_Mode: 1
         m_Arguments:

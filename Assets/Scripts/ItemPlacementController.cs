@@ -26,6 +26,11 @@ public class ItemPlacementController : MonoBehaviour
     // 指引線（可放置時才顯示）
     LineRenderer guideLine;
 
+    // 最近一次 MoveDragRay 算出來的落點，放開時直接沿用
+    // （不要在 StopDragRay 再打一次 Raycast，兩次結果不一定一樣）
+    bool lastCanPut;
+    Vector3 lastHitPoint;
+
     // 給外面的選取腳本用：現在是不是正在拖道具
     public bool IsDragging
     {
@@ -119,6 +124,7 @@ public class ItemPlacementController : MonoBehaviour
     {
         if (dragging == false || ghost == null)
         {
+            lastCanPut = false;
             return;
         }
 
@@ -126,6 +132,9 @@ public class ItemPlacementController : MonoBehaviour
 
         // 只有「不在 UI 上」而且「有打到地面」才能放
         bool canPut = (onUI == false) && hitGround;
+
+        lastCanPut = canPut;
+        lastHitPoint = hit.point;
 
         ghost.SetActive(true);
 
@@ -162,28 +171,27 @@ public class ItemPlacementController : MonoBehaviour
             return;
         }
 
-        // 條件：不在 UI、有 prefab、有打到地面
-        if (onUI == false && nowPrefab != null)
+        // 先用放開當下的射線更新一次，之後就用同一組結果決定放不放，
+        // 這樣「看得到指引線」和「真的放得下去」一定一致
+        MoveDragRay(ray, onUI);
+
+        if (lastCanPut == true && nowPrefab != null)
         {
-            bool hitGround = ShootRay(ray, out RaycastHit hit);
-            if (hitGround == true)
+            float offset = GetHalfHeight(nowPrefab);
+
+            // 真正放到場景裡（貼在地面上）
+            GameObject obj = Instantiate(nowPrefab);
+            obj.transform.position = lastHitPoint + Vector3.up * offset;
+            obj.transform.rotation = Quaternion.identity;
+            obj.name = nowPrefab.name;
+
+            // 掛上 ItemData 記名字
+            ItemData data = obj.GetComponent<ItemData>();
+            if (data == null)
             {
-                float offset = GetHalfHeight(nowPrefab);
-
-                // 真正放到場景裡（貼在地面上）
-                GameObject obj = Instantiate(nowPrefab);
-                obj.transform.position = hit.point + Vector3.up * offset;
-                obj.transform.rotation = Quaternion.identity;
-                obj.name = nowPrefab.name;
-
-                // 掛上 ItemData 記名字
-                ItemData data = obj.GetComponent<ItemData>();
-                if (data == null)
-                {
-                    data = obj.AddComponent<ItemData>();
-                }
-                data.SetName(nowPrefab.name);
+                data = obj.AddComponent<ItemData>();
             }
+            data.SetName(nowPrefab.name);
         }
 
         // 不管有沒有放成功，預覽都要清掉
@@ -204,6 +212,7 @@ public class ItemPlacementController : MonoBehaviour
 
         nowPrefab = null;
         dragging = false;
+        lastCanPut = false;
     }
 
     // 畫線：從浮空 ghost 底部 → 地面落點
