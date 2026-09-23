@@ -3,8 +3,9 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
 
-// 負責：從 UI 拖出道具 → 預覽跟著滑鼠 → 放開後放到地上（或取消）
-// 可放置時會畫一條指引線，指到曲面上的落點
+// 負責：拖出道具預覽 → 放開放到地上（或取消）+ 指引線
+// 桌面用滑鼠版 StartDrag / MoveDrag / StopDrag
+// VR 用射線版 StartDragRay / MoveDragRay / StopDragRay
 public class ItemPlacementController : MonoBehaviour
 {
     public Camera mainCam;          // 在 Inspector 手動拖 Main Camera
@@ -55,8 +56,30 @@ public class ItemPlacementController : MonoBehaviour
         guideLine.enabled = false;
     }
 
-    // ===== 拖曳開始：複製一個預覽物件出來 =====
+    // ===== 桌面：滑鼠版（給 ItemRowUI 用，行為跟以前一樣） =====
+
     public void StartDrag(GameObject prefab, Vector2 mousePos)
+    {
+        Ray ray = mainCam.ScreenPointToRay(mousePos);
+        StartDragRay(prefab, ray, CheckMouseOnUI(mousePos));
+    }
+
+    public void MoveDrag(Vector2 mousePos)
+    {
+        Ray ray = mainCam.ScreenPointToRay(mousePos);
+        MoveDragRay(ray, CheckMouseOnUI(mousePos));
+    }
+
+    public void StopDrag(Vector2 mousePos)
+    {
+        Ray ray = mainCam.ScreenPointToRay(mousePos);
+        StopDragRay(ray, CheckMouseOnUI(mousePos));
+    }
+
+    // ===== VR：射線版（之後給手柄腳本呼叫） =====
+    // onUI：射線／指標是不是正指在 UI 上（在 UI 上就不能放）
+
+    public void StartDragRay(GameObject prefab, Ray ray, bool onUI)
     {
         // 如果上次拖到一半沒清乾淨，先清掉
         ClearGhost();
@@ -89,19 +112,17 @@ public class ItemPlacementController : MonoBehaviour
         // 算一下要把物件抬高多少（因為 pivot 在中心）
         yOffset = GetHalfHeight(prefab);
 
-        MoveDrag(mousePos);
+        MoveDragRay(ray, onUI);
     }
 
-    // ===== 拖曳中：預覽跟著滑鼠走 =====
-    public void MoveDrag(Vector2 mousePos)
+    public void MoveDragRay(Ray ray, bool onUI)
     {
-        if (dragging == false || ghost == null || mainCam == null)
+        if (dragging == false || ghost == null)
         {
             return;
         }
 
-        bool onUI = CheckMouseOnUI(mousePos);
-        bool hitGround = ShootRay(mousePos, out RaycastHit hit);
+        bool hitGround = ShootRay(ray, out RaycastHit hit);
 
         // 只有「不在 UI 上」而且「有打到地面」才能放
         bool canPut = (onUI == false) && hitGround;
@@ -116,8 +137,7 @@ public class ItemPlacementController : MonoBehaviour
         }
         else
         {
-            // 沒打到地面（例如地圖外），就先跟著視線放在前方
-            Ray ray = mainCam.ScreenPointToRay(mousePos);
+            // 沒打到地面，就先放在射線前方
             ghost.transform.position = ray.GetPoint(10f);
         }
 
@@ -135,20 +155,17 @@ public class ItemPlacementController : MonoBehaviour
         }
     }
 
-    // ===== 放開：決定要不要真的生成 =====
-    public void StopDrag(Vector2 mousePos)
+    public void StopDragRay(Ray ray, bool onUI)
     {
         if (dragging == false)
         {
             return;
         }
 
-        bool onUI = CheckMouseOnUI(mousePos);
-
         // 條件：不在 UI、有 prefab、有打到地面
         if (onUI == false && nowPrefab != null)
         {
-            bool hitGround = ShootRay(mousePos, out RaycastHit hit);
+            bool hitGround = ShootRay(ray, out RaycastHit hit);
             if (hitGround == true)
             {
                 float offset = GetHalfHeight(nowPrefab);
@@ -208,18 +225,15 @@ public class ItemPlacementController : MonoBehaviour
         }
     }
 
-    // 從滑鼠位置發射線，看有沒有打到地面
-    bool ShootRay(Vector2 mousePos, out RaycastHit hit)
+    // 用現成的射線打地面（桌面、VR 共用）
+    bool ShootRay(Ray ray, out RaycastHit hit)
     {
         hit = new RaycastHit();
-
-        Ray ray = mainCam.ScreenPointToRay(mousePos);
         bool ok = Physics.Raycast(ray, out hit, rayDistance, groundLayer);
         return ok;
     }
 
-    // 檢查滑鼠是不是停在 UI 上面
-    // （用 EventSystem 做 UI 射線檢測）
+    // 檢查滑鼠是不是停在 UI 上面（桌面用）
     bool CheckMouseOnUI(Vector2 mousePos)
     {
         PointerEventData data = new PointerEventData(EventSystem.current);
