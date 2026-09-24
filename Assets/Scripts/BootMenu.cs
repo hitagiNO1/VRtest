@@ -22,7 +22,6 @@ public class BootMenu : MonoBehaviour
         RefreshStatus();
     }
 
-    // Inspector → DesktopBtn OnClick 拉這裡
     public void OnClickDesktop()
     {
         if (busy)
@@ -32,7 +31,6 @@ public class BootMenu : MonoBehaviour
         StartCoroutine(GoDesktop());
     }
 
-    // Inspector → VRBtn OnClick 拉這裡
     public void OnClickVR()
     {
         if (busy)

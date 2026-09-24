@@ -16,14 +16,20 @@ public class ItemSelectMenu : MonoBehaviour
     public float rayDistance = 500f;
     public Vector3 menuOffset = new Vector3(1.2f, 1.2f, 0f); // 世界座標偏移（在物件旁一點）
 
-    [Header("VR")]
-    public bool vrMode = false;                                 // VR 場景請勾起來
-    public float vrMenuHeight = 0.85f;                          // 選單浮在物件上方多高
-    public float vrMenuTowardCam = 0.15f;                       // 再往玩家方向挪一點，避免埋進模型
-    public float vrMenuScale = 0.005f;                          // World Space 選單大小
-    public float selectRadius = 0.35f;                          // SphereCast 半徑（備援）
+    [Header("VR 刪除選單")]
+    public bool vrMode = false;                    // VR 場景請勾起來
+    [Tooltip("選單距離相機多遠（公尺），模擬器建議 1.0～1.5")]
+    public float vrMenuDistance = 1.2f;
+    [Tooltip("World Space 選單縮放，越大越好點，模擬器建議 0.01～0.02")]
+    public float vrMenuScale = 0.012f;
+    [Tooltip("相對視線再往上偏一點（公尺）")]
+    public float vrMenuHeightOffset = 0.08f;
+    [Tooltip("SphereCast 選取半徑（備援）")]
+    public float selectRadius = 0.35f;
 
-    // 舊欄位保留，避免場景序列化遺失；實際改用上面幾個
+    // 舊欄位保留，避免場景序列化遺失（新邏輯改用上面幾個）
+    public float vrMenuHeight = 0.85f;
+    public float vrMenuTowardCam = 0.15f;
     public Vector3 vrMenuOffset = new Vector3(0f, 0.85f, 0f);
 
     GameObject menuRoot;     // 實際生出來的選單
@@ -314,7 +320,7 @@ public class ItemSelectMenu : MonoBehaviour
         menuRT.position = screenPos;
     }
 
-    // VR：選單固定在物件上方一點，正面朝向玩家（不要拉到鏡頭前方，那會離物件很遠）
+    // VR：選單放在「玩家眼前固定距離」，朝向選中物件的方向，方便模擬器射線點到
     void MoveMenuToTargetVR()
     {
         if (cam == null)
@@ -322,34 +328,50 @@ public class ItemSelectMenu : MonoBehaviour
             cam = Camera.main;
         }
 
-        float height = vrMenuHeight;
-        if (height < 0.01f)
+        if (cam == null || targetObj == null || menuRoot == null)
         {
-            height = vrMenuOffset.y;
+            return;
         }
 
-        Vector3 pos = targetObj.transform.position + Vector3.up * height;
-
-        if (cam != null)
+        // 每幀套用縮放，方便你在 Play 模式調 Inspector
+        float scale = vrMenuScale;
+        if (scale < 0.0001f)
         {
-            Vector3 toCam = cam.transform.position - pos;
-            toCam.y = 0f;
-            if (toCam.sqrMagnitude > 0.0001f)
-            {
-                // 往玩家水平方向挪一點，比較不會被模型擋住
-                pos += toCam.normalized * vrMenuTowardCam;
-            }
+            scale = 0.01f;
+        }
+        menuRoot.transform.localScale = Vector3.one * scale;
 
-            menuRoot.transform.position = pos;
+        Vector3 camPos = cam.transform.position;
+        Vector3 toObj = targetObj.transform.position - camPos;
+        float distToObj = toObj.magnitude;
 
-            // World Space Canvas 的「正面」在 -Z；LookAt 相機後再轉 180 度才是給玩家看的那一面
-            menuRoot.transform.LookAt(cam.transform);
-            menuRoot.transform.Rotate(0f, 180f, 0f);
+        Vector3 dir;
+        if (distToObj > 0.05f)
+        {
+            dir = toObj / distToObj;
         }
         else
         {
-            menuRoot.transform.position = pos;
+            dir = cam.transform.forward;
         }
+
+        // 選單放在眼前固定距離；若物件比這個還近，就放在物件前一點，避免穿過物件
+        float placeDist = vrMenuDistance;
+        if (placeDist < 0.3f)
+        {
+            placeDist = 0.3f;
+        }
+        if (distToObj > 0.05f)
+        {
+            placeDist = Mathf.Min(placeDist, Mathf.Max(0.35f, distToObj - 0.25f));
+        }
+
+        Vector3 pos = camPos + dir * placeDist + Vector3.up * vrMenuHeightOffset;
+        menuRoot.transform.position = pos;
+
+        // World Space Canvas 正面朝向玩家
+        menuRoot.transform.LookAt(cam.transform);
+        menuRoot.transform.Rotate(0f, 180f, 0f);
     }
 
     public void HideMenu()
