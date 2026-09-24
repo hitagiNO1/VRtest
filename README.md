@@ -23,3 +23,4 @@
 - 滑鼠左鍵：扳機
 - `G`：握把
 
+Thanks for reviewing! 祝中秋佳節愉快！🌕
